@@ -12,7 +12,10 @@ import {
   updatePRTitleWithShortcutId
 } from './helpers/github-events'
 
-import {getShortcutIdMessageFromSha} from './helpers/github-commits'
+import {
+  getShortcutIdMessageFromSha,
+  getShortcutIdFromPRCommits
+} from './helpers/github-commits'
 import {getShortcutIdsFromReleaseBody} from './helpers/github-releases'
 
 import {
@@ -114,7 +117,7 @@ async function run(): Promise<void> {
       }
     }
 
-    let shortcutIds = null
+    let shortcutIds: number[] = []
 
     if (shortcutId) {
       shortcutIds = [shortcutId]
@@ -123,12 +126,19 @@ async function run(): Promise<void> {
     if (EVENT_NAME === 'release') {
       const shortcutIdsFromReleaseBody = await getShortcutIdsFromReleaseBody()
       if (shortcutIdsFromReleaseBody) {
-        shortcutIds = shortcutIdsFromReleaseBody
+        shortcutIds = [...shortcutIds, ...shortcutIdsFromReleaseBody]
+      }
+    }
+
+    if (EVENT_NAME === 'push') {
+      const shortcutIdsFromCommits = await getShortcutIdFromPRCommits()
+      if (shortcutIdsFromCommits) {
+        shortcutIds = [...shortcutIds, ...shortcutIdsFromCommits]
       }
     }
 
     const shortcut = new ShortcutClient(SHORTCUT_TOKEN)
-    if (shortcutIds) {
+    if (shortcutIds?.length > 0) {
       await Promise.all(
         shortcutIds.map(id => {
           if (id) {
@@ -138,7 +148,7 @@ async function run(): Promise<void> {
             core.info(
               `Shortcut story ${id} updated, to ${
                 column?.columnName || column?.columnId
-              }`
+              } ${column?.columnId}`
             )
           }
         })
